@@ -1,0 +1,76 @@
+<!doctype html><html lang="az"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TensorFlow Playground — Təcrübə paneli</title><style>body{font:15px system-ui;background:#f5f7fb;color:#17213a;margin:0}main{max-width:1200px;margin:auto;padding:28px}h1{font-size:27px}a{color:#2356bd}.panel{background:white;padding:20px;border-radius:14px;box-shadow:0 3px 20px #1c315011;margin:20px 0}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid #e5eaf1;padding:9px;text-align:left}th{background:#eff4fb}input{box-sizing:border-box;width:90px;border:1px solid #c8d2e0;border-radius:5px;padding:7px}textarea{width:95%;min-height:44px}button{border:0;background:#2356bd;color:white;padding:11px 16px;border-radius:8px;cursor:pointer;margin:5px}small{color:#556} .scroll{overflow:auto}.warn{background:#fff4d8;padding:13px;border-radius:8px}</style><main><h1>TensorFlow Playground — Müstəqil iş</h1><p>6 tapşırıq üzrə eksperiment qeydləri. <a href="https://playground.tensorflow.org/" target="_blank">Playground-u aç</a> · <a href="HELL_VE_IZAH.md">Həll və izahlar (Markdown)</a></p><p class="warn">Rəqəmlər əvvəlcədən doldurulmayıb: real nəticələri Playground-da ölçün. Daxil etdiyiniz nəticələr bu brauzerdə saxlanır. CSV ixrac edib layihəyə əlavə edin.</p><button onclick="exportCSV()">Doldurulmuş nəticələri CSV kimi ixrac et</button><button onclick="window.print()">Çap / PDF</button><div id="sections"></div><div class="panel"><h2>Bonus — Regression</h2><p>Regression → Multi gaussian; hədəf test loss &lt; 0.02. Ən kiçik uğurlu şəbəkəni və screenshot-u qeyd edin.</p><textarea id="bonus" placeholder="Arxitektura, parametr sayı, epoch, test loss, müşahidə"></textarea></div></main><script>const groups=[["1. Tək neyron", [["1.1", "Gaussian", "X1, X2", "0", "0.03", "Tanh", "200", "Düz xətt"], ["1.2", "Circle", "X1, X2", "0", "0.03", "Tanh", "500", "Düz xətt; dairəni ayıra bilmir"], ["1.3", "Circle", "X1, X2, X1², X2²", "0", "0.03", "Tanh", "500", "Giriş fəzasında kvadratik sərhəd"]]], ["2. XOR", [["2.1", "XOR", "X1, X2", "0", "0.03", "Tanh", "500", "Xətti"], ["2.2", "XOR", "X1, X2", "1×1", "0.03", "Tanh", "500", "Məhdud qeyri-xətti"], ["2.3", "XOR", "X1, X2", "1×2", "0.03", "Tanh", "500", "Qeyri-xətti, nəticə dəyişkən"], ["2.4", "XOR", "X1, X2", "1×4", "0.03", "Tanh", "500", "Qeyri-xətti"]]], ["3. Activation", [["3.1", "Circle", "X1, X2", "1×4", "0.03", "Linear", "500", "Xətti"], ["3.2", "Circle", "X1, X2", "1×4", "0.03", "Sigmoid", "500", "Ölçülməlidir"], ["3.3", "Circle", "X1, X2", "1×4", "0.03", "Tanh", "500", "Ölçülməlidir"], ["3.4", "Circle", "X1, X2", "1×4", "0.03", "ReLU", "500", "Ölçülməlidir"]]], ["4. Spiral", [["4.1", "Spiral", "X1, X2", "2×8×8", "0.03", "Tanh", "<1000", "Ölçülməlidir"], ["4.2", "Spiral", "X1, X2", "3×6×6×6", "0.03", "Tanh", "<1000", "Ölçülməlidir"], ["4.3", "Spiral", "X1, X2", "2×6×6", "0.03", "Tanh", "<1000", "Ölçülməlidir"]]], ["5. Learning rate", [["5.1", "Circle", "X1, X2", "1×4", "0.0001", "Tanh", "100, 500", "Ölçülməlidir"], ["5.2", "Circle", "X1, X2", "1×4", "0.003", "Tanh", "100, 500", "Ölçülməlidir"], ["5.3", "Circle", "X1, X2", "1×4", "0.03", "Tanh", "100, 500", "Ölçülməlidir"], ["5.4", "Circle", "X1, X2", "1×4", "0.3", "Tanh", "100, 500", "Ölçülməlidir"], ["5.5", "Circle", "X1, X2", "1×4", "3", "Tanh", "100, 500", "Ölçülməlidir"]]], ["6. Overfitting", [["6.1", "Gaussian; noise=50", "X1, X2", "6×8", "0.03", "ReLU", "1000", "Train=10%, regularization=None"], ["6.2", "Gaussian; noise=50", "X1, X2", "6×8", "0.03", "ReLU", "1000", "Train=10%, L2=0.01"], ["6.3", "Gaussian; noise=50", "X1, X2", "1×2", "0.03", "ReLU", "1000", "Train=10%, regularization=None"], ["6.4", "Gaussian; noise=50", "X1, X2", "6×8", "0.03", "ReLU", "1000", "Train=80%, regularization=None"]]]];const fields = ['Training loss', 'Test loss', '100 epoch loss', 'Loss < 0.05 epoch', 'Screenshot adı', 'Müşahidə'];
+const columns = ['ID', 'Dataset', 'Features', 'Qat', 'LR', 'Activation', 'Epoch', 'Qeyd', ...fields];
+const sectionRoot = document.querySelector('#sections');
+const storagePrefix = 'tfplay_';
+
+function encodeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
+function storageKey(experimentId, fieldIndex) {
+  return `${storagePrefix}${experimentId}_${fieldIndex}`;
+}
+
+function readValue(experimentId, fieldIndex) {
+  return localStorage.getItem(storageKey(experimentId, fieldIndex)) ?? '';
+}
+
+function renderCell(value) {
+  return `<td>${encodeHTML(value)}</td>`;
+}
+
+function renderExperiment(values) {
+  const [id, ...details] = values;
+  const fixedCells = [id, ...details].map(renderCell).join('');
+  const editableCells = fields.map((field, index) => {
+    const value = encodeHTML(readValue(id, index));
+    return `<td><input data-experiment="${encodeHTML(id)}" data-field="${index}" value="${value}" aria-label="${encodeHTML(id + ' ' + field)}"></td>`;
+  }).join('');
+  return `<tr>${fixedCells}${editableCells}</tr>`;
+}
+
+function renderSections() {
+  sectionRoot.innerHTML = groups.map(([title, experiments]) => `
+    <section class="panel">
+      <h2>${encodeHTML(title)}</h2>
+      <div class="scroll"><table>
+        <thead><tr>${columns.map(label => `<th>${encodeHTML(label)}</th>`).join('')}</tr></thead>
+        <tbody>${experiments.map(renderExperiment).join('')}</tbody>
+      </table></div>
+    </section>`).join('');
+}
+
+sectionRoot.addEventListener('input', event => {
+  const input = event.target.closest('input[data-experiment]');
+  if (!input) return;
+  localStorage.setItem(storageKey(input.dataset.experiment, input.dataset.field), input.value);
+});
+
+const bonusField = document.querySelector('#bonus');
+bonusField.value = localStorage.getItem('tfplay_bonus') ?? '';
+bonusField.addEventListener('input', () => localStorage.setItem('tfplay_bonus', bonusField.value));
+
+function csvCell(value) {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function exportCSV() {
+  const records = [columns, ...groups.flatMap(([, experiments]) =>
+    experiments.map(experiment => [
+      ...experiment,
+      ...fields.map((_, index) => readValue(experiment[0], index))
+    ])
+  )];
+  const contents = '\uFEFF' + records.map(record => record.map(csvCell).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([contents], {type: 'text/csv;charset=utf-8'}));
+  const download = document.createElement('a');
+  download.href = url;
+  download.download = 'TensorFlow_Playground_Neticeler.csv';
+  download.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+renderSections();
+</script></html>
